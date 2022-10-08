@@ -17,7 +17,7 @@ public static class Startup
 
     public static void ConfigureServices(IConfiguration configuration, IServiceCollection services)
     {
-        var metricOptions = configuration.GetSection(nameof(MetricOptions)).Get<MetricOptions>();
+        var metricOptions = configuration.GetSection(nameof(MetricOptions)).Get<MetricOptions>() ?? new MetricOptions();
         var genevaOptions = configuration.GetSection(nameof(GenevaMetricsOptions)).Get<GenevaMetricsOptions>();
         var queueOptions = configuration.GetSection(nameof(QueueOptions)).Get<QueueOptions>();
         var exporterOptions = configuration.GetSection(nameof(ExporterOptions)).Get<ExporterOptions>();
