@@ -2,6 +2,8 @@
 
 using System;
 using System.Diagnostics.Metrics;
+using System.IO;
+using System.Reflection;
 using System.Threading.Tasks;
 using Azure.Identity;
 using Azure.Storage.Queues;
@@ -14,12 +16,13 @@ public static class Program
 {
     public static async Task Main(string[] args)
     {
-        var configuration = BuildConfiguration(args);
+        var configuration = CreateDefaultConfiguration(args)
+            .Build();
 
         var options = configuration.Get<Options>() ?? new Options();
 
-        var counter = new Meter(options.MeterName)
-            .CreateCounter<double>(options.MetricName);
+        var metric = new Meter(options.MeterName)
+            .CreateHistogram<double>(options.MetricName);
 
         using var meterProvider = BuildMeterProvider(options);
 
@@ -27,23 +30,37 @@ public static class Program
 
         while (true)
         {
-            counter.Add((await queueClient.GetPropertiesAsync())
+            metric.Record((await queueClient.GetPropertiesAsync())
                 .Value
                 .ApproximateMessagesCount);
             await Task.Delay(options.Interval);
         }
     }
 
-    private static IConfiguration BuildConfiguration(string[] args)
+    private static IConfigurationBuilder CreateDefaultConfiguration(string[] args)
     {
         var environmentName = Environment.GetEnvironmentVariable("DOTNET_Environment");
 
-        return new ConfigurationBuilder()
+        var config = new ConfigurationBuilder()
             .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-            .AddJsonFile($"appsettings.{environmentName}.json", optional: true, reloadOnChange: true)
+            .AddJsonFile($"appsettings.{environmentName}.json", optional: true, reloadOnChange: true);
+
+        if (string.Equals("Development", environmentName, StringComparison.CurrentCultureIgnoreCase))
+        {
+            try
+            {
+                var appAssembly = Assembly.GetExecutingAssembly();
+                config.AddUserSecrets(appAssembly, optional: true, reloadOnChange: true);
+            }
+            catch (FileNotFoundException)
+            {
+                // The assembly cannot be found, so just skip it.
+            }
+        }
+
+        return config
             .AddEnvironmentVariables()
-            .AddCommandLine(args)
-            .Build();
+            .AddCommandLine(args);
     }
 
     private static MeterProvider BuildMeterProvider(Options options)
