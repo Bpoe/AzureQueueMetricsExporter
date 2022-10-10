@@ -89,10 +89,9 @@ public static class Program
 
     private static QueueClient CreateQueueClient(IConfiguration configuration, Options options)
     {
-        var credential = new DefaultAzureCredential(configuration.Get<DefaultAzureCredentialOptions>());
-
         if (options?.QueueUri != null)
         {
+            var credential = new DefaultAzureCredential(configuration.Get<DefaultAzureCredentialOptions>());
             return new QueueClient(options.QueueUri, credential);
         }
 
