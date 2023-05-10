@@ -67,6 +67,7 @@ public static class Program
     {
         var meterBuilder = Sdk
             .CreateMeterProviderBuilder()
+            .AddOtlpExporter()
             .AddMeter(options.MeterName);
 
         if (options is not null && options.EnableConsole)
