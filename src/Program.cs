@@ -1,6 +1,8 @@
 ﻿namespace AzQueueMetricExporter;
 
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.IO;
 using System.Reflection;
@@ -11,9 +13,15 @@ using Microsoft.Extensions.Configuration;
 using OpenTelemetry;
 using OpenTelemetry.Exporter.Geneva;
 using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 
 public static class Program
 {
+    private static readonly TagList Attributes = new()
+    {
+        { "messaging.system", "AzureStorageQueue" },
+    };
+
     public static async Task Main(string[] args)
     {
         var configuration = CreateDefaultConfiguration(args)
@@ -22,7 +30,9 @@ public static class Program
         var options = configuration.Get<Options>() ?? new Options();
 
         var metric = new Meter(options.MeterName)
-            .CreateHistogram<double>(options.MetricName);
+            .CreateHistogram<double>(
+                options.MetricName,
+                description: "Measures the approximate count of messages in the queue.");
 
         using var meterProvider = BuildMeterProvider(options);
 
@@ -32,14 +42,15 @@ public static class Program
         {
             metric.Record((await queueClient.GetPropertiesAsync())
                 .Value
-                .ApproximateMessagesCount);
+                .ApproximateMessagesCount,
+                Attributes);
             await Task.Delay(options.Interval);
         }
     }
 
     private static IConfigurationBuilder CreateDefaultConfiguration(string[] args)
     {
-        var environmentName = Environment.GetEnvironmentVariable("DOTNET_Environment");
+        var environmentName = Environment.GetEnvironmentVariable("DOTNET_Environment") ?? "Production";
 
         var config = new ConfigurationBuilder()
             .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
@@ -67,6 +78,7 @@ public static class Program
     {
         var meterBuilder = Sdk
             .CreateMeterProviderBuilder()
+            .SetResourceBuilder(ResourceBuilder.CreateDefault())
             .AddOtlpExporter()
             .AddMeter(options.MeterName);
 
@@ -90,7 +102,7 @@ public static class Program
 
     private static QueueClient CreateQueueClient(IConfiguration configuration, Options options)
     {
-        if (options?.QueueUri != null)
+        if (options?.QueueUri is not null)
         {
             var credential = new DefaultAzureCredential(configuration.Get<DefaultAzureCredentialOptions>());
             return new QueueClient(options.QueueUri, credential);

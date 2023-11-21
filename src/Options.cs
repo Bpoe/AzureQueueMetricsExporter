@@ -14,7 +14,7 @@ public class Options
 
     public string MeterName { get; set; } = "AzureStorage";
 
-    public string MetricName { get; set; } = "Queue_ApproximateMessages_Count";
+    public string MetricName { get; set; } = "messaging.queue.message_count";
 
     public string QueueConnectionString { get; set; } = string.Empty;
 
